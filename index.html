@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Rekomendasi Triase</title>
+    <!-- Memuat Tailwind CSS untuk styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Menggunakan font Inter untuk tampilan yang bersih -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Menerapkan font Inter ke seluruh halaman */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Style untuk spinner loading */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen">
+
+    <div class="w-full max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-8 md:p-12 my-8">
+        
+        <!-- Header -->
+        <div class="text-center mb-10">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800">RujukCerdas</h1>
+            <p class="text-gray-500 mt-2">Masukkan data pasien untuk mendapatkan rekomendasi departemen.</p>
+        </div>
+
+        <!-- Form Input Data Pasien -->
+        <form id="triage-form">
+            <div class="space-y-6">
+                
+                <!-- Input Jenis Kelamin -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Jenis Kelamin</label>
+                    <div class="flex items-center space-x-6">
+                        <label class="flex items-center">
+                            <input type="radio" name="gender" value="male" class="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500" checked>
+                            <span class="ml-2 text-gray-700">Laki-laki</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="gender" value="female" class="h-4 w-4 text-pink-600 border-gray-300 focus:ring-pink-500">
+                            <span class="ml-2 text-gray-700">Perempuan</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Input Usia -->
+                <div>
+                    <label for="age" class="block text-sm font-medium text-gray-700">Usia</label>
+                    <input type="number" name="age" id="age" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3" placeholder="Contoh: 35">
+                </div>
+
+                <!-- Input Gejala -->
+                <div>
+                    <label for="symptoms" class="block text-sm font-medium text-gray-700">Gejala yang Dirasakan</label>
+                    <textarea id="symptoms" name="symptoms" rows="4" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-3" placeholder="Masukkan setiap gejala di baris baru atau pisahkan dengan koma.&#10;Contoh:&#10;pusing&#10;mual&#10;sulit berjalan"></textarea>
+                </div>
+            </div>
+
+            <!-- Tombol Submit -->
+            <div class="mt-10">
+                <button type="submit" id="submit-button" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                    Dapatkan Rekomendasi
+                </button>
+            </div>
+        </form>
+
+        <!-- Area Hasil Rekomendasi -->
+        <div id="result-container" class="mt-10 p-6 rounded-lg bg-gray-50 hidden">
+             <h3 class="text-lg font-semibold text-gray-800 mb-3 text-center">Hasil Rekomendasi</h3>
+             <div id="result-content" class="text-center">
+                <!-- Konten hasil akan dimasukkan oleh JavaScript -->
+             </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Mendapatkan elemen-elemen dari halaman HTML
+        const triageForm = document.getElementById('triage-form');
+        const submitButton = document.getElementById('submit-button');
+        const resultContainer = document.getElementById('result-container');
+        const resultContent = document.getElementById('result-content');
+
+        // Menambahkan event listener saat form disubmit
+        triageForm.addEventListener('submit', async function(event) {
+            // Mencegah form melakukan refresh halaman (perilaku default)
+            event.preventDefault();
+
+            // Menampilkan status loading
+            showLoading();
+
+            // Mengambil data dari form
+            const formData = new FormData(triageForm);
+            const gender = formData.get('gender');
+            const age = parseInt(formData.get('age'));
+            
+            // Mengubah teks gejala menjadi array (list), memisahkan berdasarkan baris baru atau koma
+            const symptomsText = formData.get('symptoms');
+            const symptoms = symptomsText.split(/[\n,]+/).map(s => s.trim()).filter(s => s);
+
+            // Memvalidasi input
+            if (!age || symptoms.length === 0) {
+                showError('Usia dan Gejala wajib diisi.');
+                return;
+            }
+            
+            // Menyiapkan data untuk dikirim ke API
+            const patientData = {
+                gender: gender,
+                age: age,
+                symptoms: symptoms
+            };
+
+            try {
+                // Mengirim data ke backend FastAPI menggunakan fetch API
+                // Pastikan alamat ini sesuai dengan tempat server FastAPI Anda berjalan
+                const response = await fetch('http://127.0.0.1:8000/recommend', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(patientData),
+                });
+
+                // Jika respons dari server tidak OK (misal: error 500, 429)
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    // Menampilkan pesan error yang lebih spesifik jika ada
+                    throw new Error(errorData.detail || `Terjadi error: ${response.statusText}`);
+                }
+
+                // Mengambil data JSON dari respons yang berhasil
+                const data = await response.json();
+                
+                // Menampilkan hasil rekomendasi
+                showSuccess(data.recommended_department);
+
+            } catch (error) {
+                // Menangkap dan menampilkan error jika terjadi masalah koneksi atau lainnya
+                console.error('Error:', error);
+                showError(error.message || 'Tidak dapat terhubung ke server. Pastikan server sudah berjalan.');
+            }
+        });
+
+        // Fungsi untuk menampilkan status loading
+        function showLoading() {
+            resultContainer.classList.remove('hidden');
+            resultContent.innerHTML = '<div class="loader mx-auto"></div><p class="mt-2 text-gray-500">Menganalisis data...</p>';
+            submitButton.disabled = true;
+            submitButton.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+
+        // Fungsi untuk menampilkan hasil yang sukses
+        function showSuccess(department) {
+            resultContent.innerHTML = `<p class="text-gray-600">Pasien direkomendasikan untuk ke departemen:</p><p class="text-2xl font-bold text-blue-600 mt-2">${department}</p>`;
+            resultContainer.style.borderColor = '#34D399'; // Warna hijau
+            submitButton.disabled = false;
+            submitButton.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        // Fungsi untuk menampilkan pesan error
+        function showError(message) {
+            resultContent.innerHTML = `<p class="text-red-600 font-medium">Terjadi Kesalahan</p><p class="text-sm text-gray-500 mt-1">${message}</p>`;
+            resultContainer.style.borderColor = '#EF4444'; // Warna merah
+            submitButton.disabled = false;
+            submitButton.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+    </script>
+
+</body>
+</html>
